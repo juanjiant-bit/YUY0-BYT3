@@ -1,0 +1,24 @@
+.program pcm5102_i2s
+.side_set 2
+; sideset bit0 = BCLK, bit1 = LRCK/WS
+; OUT pin = DIN
+;
+; This backend sends 16-bit stereo frames packed as:
+;   bits 31..16 = Left
+;   bits 15..0  = Right
+;
+; It uses a 16-bit-per-channel left-justified style stream. On many PCM5102A
+; boards this works directly; if a given breakout is strapped strictly for
+; standard I2S only, further timing adjustment may be needed.
+.wrap_target
+    pull   block      side 0b00
+    set    x, 15      side 0b00
+left_loop:
+    out    pins, 1    side 0b00
+    jmp    x-- left_loop side 0b01
+
+    set    x, 15      side 0b10
+right_loop:
+    out    pins, 1    side 0b10
+    jmp    x-- right_loop side 0b11
+.wrap

@@ -1,0 +1,23 @@
+# Build
+build/
+*.uf2
+*.elf
+*.bin
+*.hex
+*.map
+*.d
+*.o
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+generated/
+
+# IDEs
+.vscode/
+.idea/
+*.code-workspace
+
+# OS
+.DS_Store
+Thumbs.db

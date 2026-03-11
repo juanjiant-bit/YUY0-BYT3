@@ -1,0 +1,87 @@
+name: Build UF2
+
+on:
+  push:
+    branches: [ main, master ]
+    tags:
+      - "v*"
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      PICO_SDK_PATH: ${{ github.workspace }}/pico-sdk
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake ninja-build build-essential \
+            gcc-arm-none-eabi libnewlib-arm-none-eabi \
+            libstdc++-arm-none-eabi-newlib \
+            git python3
+
+      - name: Clone Pico SDK
+        run: |
+          git clone --depth 1 --branch 2.1.0 https://github.com/raspberrypi/pico-sdk.git
+          cd pico-sdk && git submodule update --init --depth 1
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DPICO_BOARD=pico
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Verify
+        run: |
+          test -f build/bytebeat_machine.uf2
+          ls -lah build/bytebeat_machine.*
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: bytebeat_machine_firmware_${{ github.sha }}
+          path: |
+            build/bytebeat_machine.uf2
+            build/bytebeat_machine.elf
+            build/bytebeat_machine.bin
+            build/bytebeat_machine.hex
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download firmware artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: bytebeat_machine_firmware_${{ github.sha }}
+          path: dist
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/bytebeat_machine.uf2
+            dist/bytebeat_machine.elf
+            dist/bytebeat_machine.bin
+            dist/bytebeat_machine.hex
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

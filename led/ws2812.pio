@@ -1,0 +1,42 @@
+; ws2812.pio — WS2812 one-wire 800kHz driver for RP2040 PIO
+; Timing: T1=350ns T2=900ns T3=350ns @ 800kHz
+; Side-set: 1 pin (data out)
+; Input: 32-bit words shifted MSB-first, only top 24 bits used (GRB format)
+
+.program ws2812
+.side_set 1
+
+.wrap_target
+bitloop:
+    out x, 1        side 0 [2]   ; 3 cycles low  → T3 done, load next bit
+    jmp !x, do_zero side 1 [1]   ; 2 cycles high → T1 for zero
+do_one:
+    jmp bitloop     side 1 [4]   ; 5 cycles high → T2 for one  (total=8)
+do_zero:
+    nop             side 0 [4]   ; 5 cycles low  → T3 for zero (total=8)
+.wrap
+
+% c-sdk {
+#include "pico/stdlib.h"
+#include "hardware/pio.h"
+#include "hardware/clocks.h"
+
+static inline void ws2812_program_init(PIO pio, uint sm, uint offset,
+                                        uint pin, float freq) {
+    pio_gpio_init(pio, pin);
+    pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, true);
+
+    pio_sm_config c = ws2812_program_get_default_config(offset);
+    sm_config_set_sideset_pins(&c, pin);
+    sm_config_set_out_shift(&c, false, true, 24);  // MSB first, autopull 24 bits
+    sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_TX);
+
+    // Clock divider: sysclk / (freq * cycles_per_bit)
+    // cycles_per_bit = 10 (3+2+5 or 3+2+5)
+    float div = clock_get_hz(clk_sys) / (freq * 10.0f);
+    sm_config_set_clkdiv(&c, div);
+
+    pio_sm_init(pio, sm, offset, &c);
+    pio_sm_set_enabled(pio, sm, true);
+}
+%}
