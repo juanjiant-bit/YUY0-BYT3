@@ -179,7 +179,10 @@ private:
     static constexpr uint32_t COL_FX_VIBRATO = 0x002840; // azul-cian
     static constexpr uint32_t COL_FX_RPT4    = 0x001830; // azul marino
     static constexpr uint32_t COL_FX_RPT8    = 0x001820; // verde-azul
-    static constexpr const uint32_t* FX_COLORS[7]; // inicializado abajo
+    static constexpr uint32_t FX_COLORS[7] = {
+        COL_FX_STUTTER, COL_FX_FREEZE, COL_FX_OCT_DN, COL_FX_OCT_UP,
+        COL_FX_VIBRATO, COL_FX_RPT4,   COL_FX_RPT8
+    };
 
     // ── HOME feedback visual ──────────────────────────────────────
     // Durante el hold del encoder, los LEDs hacen un fill progresivo:
