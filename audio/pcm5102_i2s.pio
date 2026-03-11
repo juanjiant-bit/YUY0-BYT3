@@ -22,3 +22,35 @@ right_loop:
     out    pins, 1    side 0b10
     jmp    x-- right_loop side 0b11
 .wrap
+
+% c-sdk {
+#include "hardware/clocks.h"
+#include "hardware/gpio.h"
+
+static inline void pcm5102_i2s_program_init(PIO pio, uint sm, uint offset,
+                                             uint pin_din, uint pin_bclk,
+                                             uint sample_rate) {
+    // pin_bclk = BCLK (sideset bit0), pin_bclk+1 = LRCK (sideset bit1)
+    pio_gpio_init(pio, pin_din);
+    pio_gpio_init(pio, pin_bclk);
+    pio_gpio_init(pio, pin_bclk + 1);
+
+    pio_sm_set_consecutive_pindirs(pio, sm, pin_din,     1, true);
+    pio_sm_set_consecutive_pindirs(pio, sm, pin_bclk,    2, true);
+
+    pio_sm_config c = pcm5102_i2s_program_get_default_config(offset);
+    sm_config_set_out_pins(&c, pin_din, 1);
+    sm_config_set_sideset_pins(&c, pin_bclk);
+    sm_config_set_out_shift(&c, false, true, 32);  // MSB-first, autopull 32b
+    sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_TX);
+
+    // Clock: necesitamos BCLK = sample_rate * 32 bits * 2 canales
+    // PIO corre a 2 ciclos por bit → sysclk_div = sysclk / (bclk * 2)
+    uint32_t sysclk = clock_get_hz(clk_sys);
+    float div = (float)sysclk / (float)(sample_rate * 32u * 2u * 2u);
+    sm_config_set_clkdiv(&c, div);
+
+    pio_sm_init(pio, sm, offset, &c);
+    pio_sm_set_enabled(pio, sm, true);
+}
+%}
